@@ -3,34 +3,39 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from mpl_toolkits.mplot3d import Axes3D
-from triangulate_grid import triangulate
+from triangulate_grid import triangulate, triangulate_hole, plot_tri_array
 
 class FEM(object):
 
-    def __init__(self,start, end, hx, hy):
+    def __init__(self, start, end, hx, hy, hole_start, hole_end):
         """
         Initialization creates the mesh for the problem.
         """
-        triangles, mesh, boundary, internal, area = triangulate(start, end, hx, hy)
+        mesh, boundary, internal, triangles = triangulate_hole(start, end, hx, hy, hole_start, hole_end)
         self.triangles = triangles
         self.mesh = mesh 
         self.boundary = boundary
         self.internal = internal
-        self.area = area 
-
+        self.area = (hx*hy)/2.0
+        self.hx, self.hy = hx,hy
 
     def adj_triangles(self,node_coord):
         """
         Finds the triangles that are adjacent to a node coordinate
         """
-        adj_tri = []
-        
-        for tri in self.triangles:
-            for coord in tri:
-                if coord == node_coord:
-                    adj_tri.append(tri)
-                    break
+        node_index = self.internal.index(node_coord)
+        adj_tri = self.triangles[node_index]
+
         return adj_tri
+        # adj_tri = []
+        
+        # for tri in self.triangles:
+        #     if node_coord in tri:
+        #         adj_tri.append(tri)
+        # # adj_tri = self.internal_dict[str(self.internal.index(node_coord))]
+        # return adj_tri
+
+        # return self.adj_triangle_dict[str(node_coord)]
 
  
     def calc_param(self,tri_coord,node_coord):
@@ -39,7 +44,7 @@ class FEM(object):
         the coordinates of a node 
         calculate beta and gamma for that piece of basis function
             -tri_coord is the list of coordinates of the triangle on which we're calculating params 
-            -node_coord is the coordnates of the node coord around which we're calculating params. 
+            -node_coord is the coordinates of the node coord around which we're calculating params. 
         """
         x_basis, y_basis = node_coord
         A = []
@@ -69,25 +74,23 @@ class FEM(object):
         """
         node_i = self.internal[i]
         node_j = self.internal[j]
-        # x_i, y_i = self.internal[i]
-        # x_j, y_j = self.internal[j]
         adj_i = self.adj_triangles(node_i)
         adj_j = self.adj_triangles(node_j)
         shared_tri = [] 
-
         for tri_i in adj_i:
             for tri_j in adj_j:
-                if tri_i == tri_j:
+                if sorted(tri_i) == sorted(tri_j):
                     shared_tri.append(tri_i)
                     break 
 
+        # print(len(shared_tri))
+
+
         total_integral = 0.0
         for tri_h in shared_tri:
-        #         area_h = tri_area(tri_h)
-            area_h = 0.5 #for this problem
             beta_i, gamma_i = self.calc_param(tri_h,node_i)
             beta_j, gamma_j = self.calc_param(tri_h,node_j)
-            total_integral += ((beta_i*beta_j)+(gamma_i*gamma_j))*area_h
+            total_integral += ((beta_i*beta_j)+(gamma_i*gamma_j))*self.area 
             
         return total_integral 
 
@@ -106,7 +109,7 @@ class FEM(object):
 
 
 if __name__ == '__main__':
-    solver = FEM([0,0],[5,5],.25,.25)
+    solver = FEM([0,0],[5,5],.5,.5,[0,0],[2,2])
     u = solver.solve()
     bound, internal = solver.boundary, solver.internal
     mesh = solver.boundary + solver.internal 
@@ -115,4 +118,13 @@ if __name__ == '__main__':
     ax = fig.add_subplot(111, projection='3d')
     ax.plot_trisurf(x_mesh, y_mesh, u)
     plt.show()
+
+
+
+
+
+
+
+
+
 
